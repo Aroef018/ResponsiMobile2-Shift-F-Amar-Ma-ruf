@@ -1,56 +1,164 @@
 <template>
   <ion-page>
-    <ion-header :translucent="true">
+    <ion-header>
       <ion-toolbar>
-        <ion-title>Blank</ion-title>
+        <ion-title>Data Pahlawan</ion-title>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content :fullscreen="true">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title size="large">Blank</ion-title>
-        </ion-toolbar>
-      </ion-header>
+    <ion-content>
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>{{ editMode ? "Edit Pahlawan" : "Tambah Pahlawan" }}</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-item>
+            <ion-label position="floating"></ion-label>
+            <ion-input v-model="newPahlawan.nama" placeholder="Masukkan nama"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-label position="floating"></ion-label>
+            <ion-textarea v-model="newPahlawan.deskripsi" placeholder="Masukkan deskripsi"></ion-textarea>
+          </ion-item>
+          <ion-button @click="addPahlawan()">
+            {{ editMode ? "Simpan" : "Tambah" }}
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
 
-      <div id="container">
-        <strong>Ready to create an app?</strong>
-        <p>Start with Ionic <a target="_blank" rel="noopener noreferrer" href="https://ionicframework.com/docs/components">UI Components</a></p>
-      </div>
+      <!-- Daftar Pahlawan -->
+      <ion-card v-for="pahlawan in pahlawans" :key="pahlawan.id" class="todo-item">
+        <ion-card-header>
+          <ion-card-subtitle class="ion-text-wrap">{{ pahlawan.deskripsi }}</ion-card-subtitle>
+          <ion-card-title class="ion-text-wrap">{{ pahlawan.nama }}</ion-card-title>
+          
+        </ion-card-header>
+        <ion-card-content>
+          <ion-button color="primary" size="small" @click="editPahlawan(pahlawan)">Edit</ion-button>
+          <ion-button color="danger" size="small" @click="deletePahlawan(pahlawan.id!)">Hapus</ion-button>
+        </ion-card-content>
+      </ion-card>
     </ion-content>
   </ion-page>
 </template>
 
-<script setup lang="ts">
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/vue';
+<script lang="ts">
+import {
+  IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonCard,
+  IonCardHeader,
+  IonCardTitle,
+  IonCardSubtitle,
+  IonCardContent,
+  IonItem,
+  IonLabel,
+  IonInput,
+  IonTextarea,
+  IonButton,
+} from "@ionic/vue";
+import { defineComponent } from "vue";
+import { Timestamp } from "firebase/firestore";
+import { firestoreService, type Pahlawan } from '@/utils/firestore';
+
+export default defineComponent({
+  name: "PahlawanPage",
+  components: {
+    IonPage,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonContent,
+    IonCard,
+    IonCardHeader,
+    IonCardTitle,
+    IonCardSubtitle,
+    IonCardContent,
+    IonItem,
+    IonLabel,
+    IonInput,
+    IonTextarea,
+    IonButton,
+  },
+  data() {
+    return {
+      pahlawans: [] as Pahlawan[],
+      newPahlawan: {
+        nama: "",
+        deskripsi: "",
+      },
+      editMode: false,
+      editId: "",
+    };
+  },
+  methods: {
+    async fetchPahlawans() {
+      try {
+        this.pahlawans = await firestoreService.getPahlawans();
+      } catch (error) {
+        console.error("Error fetching pahlawans:", error);
+      }
+    },
+
+    async addPahlawan() {
+      if (!this.newPahlawan.nama || !this.newPahlawan.deskripsi) {
+        alert("Nama dan Deskripsi harus diisi!");
+        return;
+      }
+      try {
+        if (this.editMode) {
+          await firestoreService.updatePahlawan(this.editId, {
+            nama: this.newPahlawan.nama,
+            deskripsi: this.newPahlawan.deskripsi,
+            updatedAt: Timestamp.now(),
+          });
+          this.editMode = false;
+          this.editId = ""; 
+        } else {
+          await firestoreService.addPahlawan({
+            nama: this.newPahlawan.nama,
+            deskripsi: this.newPahlawan.deskripsi,
+            status: false,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+        }
+        this.newPahlawan = { nama: "", deskripsi: "" };
+        this.fetchPahlawans();
+      } catch (error) {
+        console.error("Error:", error);
+      }
+    },
+
+    editPahlawan(pahlawan: Pahlawan) {
+      this.editMode = true;
+      this.editId = pahlawan.id!;
+      this.newPahlawan = {
+        nama: pahlawan.nama,
+        deskripsi: pahlawan.deskripsi
+      };
+    },
+
+    async deletePahlawan(id: string) {
+      try {
+        await firestoreService.deletePahlawan(id);
+        this.fetchPahlawans();
+      } catch (error) {
+        console.error("Error deleting pahlawan:", error);
+      }
+    },
+  },
+  async mounted() {
+    await this.fetchPahlawans();
+  },
+});
 </script>
 
 <style scoped>
-#container {
-  text-align: center;
-  
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-#container strong {
-  font-size: 20px;
-  line-height: 26px;
-}
-
-#container p {
-  font-size: 16px;
-  line-height: 22px;
-  
-  color: #8c8c8c;
-  
-  margin: 0;
-}
-
-#container a {
-  text-decoration: none;
+.todo-item {
+  margin-bottom: 16px;
 }
 </style>
